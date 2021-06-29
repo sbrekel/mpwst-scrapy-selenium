@@ -1,6 +1,7 @@
 """This module contains the test cases for the middlewares of the ``scrapy_selenium`` package"""
 
 from unittest.mock import patch
+from contextlib import ExitStack
 
 from scrapy import Request
 from scrapy.crawler import Crawler
@@ -33,7 +34,8 @@ class SeleniumMiddlewareTestCase(BaseScrapySeleniumTestCase):
 
         super().tearDownClass()
 
-        cls.selenium_middleware.driver.quit()
+        while not(cls.selenium_middleware.driver_queue.empty()):
+            cls.selenium_middleware.driver_queue.get().quit()
 
     def test_from_crawler_method_should_initialize_the_driver(self):
         """Test that the ``from_crawler`` method should initialize the selenium driver"""
@@ -45,14 +47,26 @@ class SeleniumMiddlewareTestCase(BaseScrapySeleniumTestCase):
 
         selenium_middleware = SeleniumMiddleware.from_crawler(crawler)
 
-        # The driver must be initialized
-        self.assertIsNotNone(selenium_middleware.driver)
+        # The driver_queue must be initialized
+        self.assertIsNotNone(selenium_middleware.driver_queue)
+        # Each driver in the queue must be initialized:
+        for i in range(0,selenium_middleware.driver_queue.qsize()):
+            # queue is FIFO, so this should test all of them.
+            driver = selenium_middleware.driver_queue.get()
+            self.assertIsNotNone(driver)
+            selenium_middleware.driver_queue.put(driver)
 
-        # We can now use the driver
-        selenium_middleware.driver.get('http://www.python.org')
-        self.assertIn('Python', selenium_middleware.driver.title)
+        # Test all of the drivers in the queue
+        for i in range(0, selenium_middleware.driver_queue.qsize()):
+            driver = selenium_middleware.driver_queue.get()
+            driver.get('http://www.python.org')
+            self.assertIsNotNone(driver)
+            self.assertIn('Python', driver.title)
+            selenium_middleware.driver_queue.put(driver)
 
-        selenium_middleware.driver.close()
+        for i in range(0, selenium_middleware.driver_queue.qsize()):
+            driver = selenium_middleware.driver_queue.get()
+            driver.close()
 
     def test_spider_closed_should_close_the_driver(self):
         """Test that the ``spider_closed`` method should close the driver"""
@@ -64,10 +78,14 @@ class SeleniumMiddlewareTestCase(BaseScrapySeleniumTestCase):
 
         selenium_middleware = SeleniumMiddleware.from_crawler(crawler)
 
-        with patch.object(selenium_middleware.driver, 'quit') as mocked_quit:
+        with ExitStack() as stack:
+            mocked_quits = []
+            for i in range(0, selenium_middleware.driver_queue.qsize()):
+                mocked_quits.append(stack.enter_context(patch.object(selenium_middleware.driver_queue.get(), 'quit')))
             selenium_middleware.spider_closed()
 
-        mocked_quit.assert_called_once()
+        for mocked_quit in mocked_quits:
+            mocked_quit.assert_called_once()
 
     def test_process_request_should_return_none_if_not_selenium_request(self):
         """Test that the ``process_request`` should return none if not selenium request"""
@@ -91,10 +109,10 @@ class SeleniumMiddlewareTestCase(BaseScrapySeleniumTestCase):
             spider=None
         )
 
-        # We have access to the driver on the response via the "meta"
-        self.assertEqual(
+        # The driver assigned to this request is no longer in the driver queue
+        self.assertNotIn(
             html_response.meta['driver'],
-            self.selenium_middleware.driver
+            self.selenium_middleware.driver_queue
         )
 
         # We also have access to the "selector" attribute on the response

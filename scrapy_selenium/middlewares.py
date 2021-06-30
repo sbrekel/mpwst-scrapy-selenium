@@ -112,7 +112,7 @@ class SeleniumMiddleware:
         driver = self.driver_queue.get()
 
         try:
-            user_agent = request.headers['User-Agent']  # take user-agent from scrapy
+            user_agent = request.headers['User-Agent'].decode('utf-8')  # take user-agent from scrapy
             driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": user_agent})
         except AttributeError:
             spider.logger.info('Cannot set selenium user agent. Currently, this is only implemented for chromedriver. Are you using Chrome?')

@@ -9,7 +9,9 @@ from scrapy.exceptions import NotConfigured
 from selenium.webdriver.support.ui import WebDriverWait
 
 from .http import SeleniumRequest, SeleniumHtmlResponse
+import logging
 
+logger = logging.getLogger(__name__)
 
 class SeleniumMiddleware:
     """Scrapy middleware handling the requests using selenium"""
@@ -110,6 +112,7 @@ class SeleniumMiddleware:
         if not isinstance(request, SeleniumRequest):
             return None
         driver = self.driver_queue.get()
+        logger.debug(f'Getting webdriver from the queue ({self.driver_queue.qsize()} drivers available).')
 
         try:
             user_agent = request.headers['User-Agent'].decode('utf-8')  # take user-agent from scrapy

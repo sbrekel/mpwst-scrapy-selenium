@@ -2,7 +2,9 @@
 
 from scrapy import Request
 from scrapy.http import HtmlResponse
+import logging
 
+logger = logging.getLogger(__name__)
 
 class SeleniumRequest(Request):
     """Scrapy ``Request`` subclass providing additional arguments"""
@@ -40,6 +42,7 @@ class SeleniumRequest(Request):
         if driver:
             driver.get('about:blank')  # get a blank tab -- ensures next request using driver won't have "stale" content
             middleware.driver_queue.put(driver)
+            logger.debug(f'Returned driver to the queue ({middleware.driver_queue.qsize()} drivers available)')
             del self.meta['driver']
 
 

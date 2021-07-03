@@ -31,7 +31,17 @@ will use the user-agent, provided you place the user-agent middleware at a highe
 
 3) Added `wait_sleep` as an unconditional delay after a selenium webdriver gets a page but before it returns the page source.
    I've found this to be more convenient than waits conditional on specific elements on the page (e.g., implicit waits, which are also available) 
-   
+
+
+## Just Test it Real Quick
+I included the files necessary to create a docker image
+
+If you just want to test out better-scrapy-selenium to see that it works, you can run the files in the `./docker` folder:
+1. Build the docker image with `build.sh` (posix) / `build.bat` (win)
+2. Make a container with `makecontainer.sh` (posix) / `makecontainer.bat`
+3. Shell into the container `shell.sh` (posix) / `shell.bat` (win)
+4. Start the scrapy test spider with `/test_spider/scrapy crawl TestSpider`  
+5. If you want to make small changes to the test spider, you can edit `settings.py` and `TestSpider.py` in `./docker/` and run `refresh.sh` (posix) / `refresh.bat` (win) to copy these into the docker container. 
 
 
 ## Installation
@@ -49,6 +59,7 @@ You will also need one of the Selenium [compatible browsers](http://www.selenium
     SELENIUM_DRIVER_ARGUMENTS=['--window-size=1920,1080','--headless']  
     SELENIUM_MAX_INSTANCES = 16 # if not set, will default to match CONCURRENT_REQUESTS 
     ```
+
 
 In order to use a remote Selenium driver, specify `SELENIUM_COMMAND_EXECUTOR` instead of `SELENIUM_DRIVER_EXECUTABLE_PATH`:
     ```python

@@ -1,0 +1,1 @@
+docker exec -it bss /bin/bash

@@ -7,7 +7,7 @@ import time
 from scrapy import signals
 from scrapy.exceptions import NotConfigured
 from selenium.webdriver.support.ui import WebDriverWait
-
+from seleniumwire.webdriver import Chrome, ChromeOptions
 from .http import SeleniumRequest, SeleniumHtmlResponse
 import logging
 
@@ -33,43 +33,36 @@ class SeleniumMiddleware:
         command_executor: str
             Selenium remote server endpoint
         """
-
-        webdriver_base_path = f'selenium.webdriver.{driver_name}'
-
-        driver_klass_module = import_module(f'{webdriver_base_path}.webdriver')
-        driver_klass = getattr(driver_klass_module, 'WebDriver')
-
-        driver_options_module = import_module(f'{webdriver_base_path}.options')
-        driver_options_klass = getattr(driver_options_module, 'Options')
-
+        driver_klass = Chrome
+        driver_options_klass = ChromeOptions
         driver_options = driver_options_klass()
 
-        if browser_executable_path:
-            driver_options.binary_location = browser_executable_path
         for argument in driver_arguments:
             driver_options.add_argument(argument)
 
+        driver_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+        driver_options.add_argument("--ignore-certificate-errors")
+        driver_options.add_argument('--headless')
         driver_kwargs = {
-            'executable_path': driver_executable_path,
-            f'{driver_name}_options': driver_options
+           # 'executable_path': driver_executable_path,
+            'options': driver_options
         }
+
 
         self.driver_queue = Queue(maxsize=max_driver_instances)
 
         # locally installed driver
-        if driver_executable_path is not None:
-            driver_kwargs = {
-                'executable_path': driver_executable_path,
-                f'{driver_name}_options': driver_options
-            }
-            for i in range(0, max_driver_instances):
-                self.driver_queue.put(driver_klass(**driver_kwargs))        # remote driver
+        for i in range(0, max_driver_instances):
+            self.driver_queue.put(driver_klass(**driver_kwargs))        # remote driver
+
+        ''' 
         elif command_executor is not None:
             from selenium import webdriver
             capabilities = driver_options.to_capabilities()
             for i in range(0, max_driver_instances):
                 self.driver_queue.put(webdriver.Remote(command_executor=command_executor,
                                                        desired_capabilities=capabilities))
+        '''   
 
     @classmethod
     def from_crawler(cls, crawler):

@@ -42,7 +42,7 @@ class SeleniumMiddleware:
 
         driver_options.add_experimental_option("excludeSwitches", ["enable-logging"])
         driver_options.add_argument("--ignore-certificate-errors")
-        driver_options.add_argument('--headless')
+        #driver_options.add_argument('--headless')
         driver_kwargs = {
            # 'executable_path': driver_executable_path,
             'options': driver_options

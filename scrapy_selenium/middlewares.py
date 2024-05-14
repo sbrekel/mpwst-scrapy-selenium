@@ -9,6 +9,8 @@ from scrapy.exceptions import NotConfigured
 from selenium.webdriver.support.ui import WebDriverWait
 from seleniumwire.webdriver import Chrome, ChromeOptions
 from .http import SeleniumRequest, SeleniumHtmlResponse
+from selenium.webdriver.chrome.service import Service as ChromeService
+from subprocess import CREATE_NO_WINDOW
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +19,7 @@ class SeleniumMiddleware:
     """Scrapy middleware handling the requests using selenium"""
 
     def __init__(self, driver_name, driver_executable_path,
-                 browser_executable_path, command_executor, driver_arguments, max_driver_instances):
+                 browser_executable_path, command_executor, driver_arguments, experimental_driver_arguments, max_driver_instances):
         """Initialize the selenium webdriver
 
         Parameters
@@ -33,19 +35,25 @@ class SeleniumMiddleware:
         command_executor: str
             Selenium remote server endpoint
         """
-        driver_klass = Chrome
+        self.driver_klass = Chrome
         driver_options_klass = ChromeOptions
         driver_options = driver_options_klass()
 
         for argument in driver_arguments:
             driver_options.add_argument(argument)
+        for argument in experimental_driver_arguments:
+            option, value = argument
+            driver_options.add_experimental_option(option, value)
 
-        driver_options.add_experimental_option("excludeSwitches", ["enable-logging"])
-        driver_options.add_argument("--ignore-certificate-errors")
+        chrome_service = ChromeService()
+        chrome_service.creationflags = CREATE_NO_WINDOW
+        #driver_options.add_experimental_option("excludeSwitches", ["enable-logging"])
+        #driver_options.add_argument("--ignore-certificate-errors")
         #driver_options.add_argument('--headless')
-        driver_kwargs = {
+        self.driver_kwargs = {
            # 'executable_path': driver_executable_path,
-            'options': driver_options
+            'options': driver_options,
+            'service': chrome_service
         }
 
 
@@ -53,7 +61,7 @@ class SeleniumMiddleware:
 
         # locally installed driver
         for i in range(0, max_driver_instances):
-            self.driver_queue.put(driver_klass(**driver_kwargs))        # remote driver
+            self.driver_queue.put(self.driver_klass(**self.driver_kwargs))        # remote driver
 
         ''' 
         elif command_executor is not None:
@@ -73,6 +81,7 @@ class SeleniumMiddleware:
         browser_executable_path = crawler.settings.get('SELENIUM_BROWSER_EXECUTABLE_PATH')
         command_executor = crawler.settings.get('SELENIUM_COMMAND_EXECUTOR')
         driver_arguments = crawler.settings.get('SELENIUM_DRIVER_ARGUMENTS')
+        experimental_driver_arguments = crawler.settings.get('SELENIUM_EXPERIMENTAL_DRIVER_ARGUMENTS')
         concurrent_requests = crawler.settings.get('CONCURRENT_REQUESTS')
         max_driver_instances = crawler.settings.get('SELENIUM_MAX_INSTANCES')
 
@@ -92,6 +101,7 @@ class SeleniumMiddleware:
             browser_executable_path=browser_executable_path,
             command_executor=command_executor,
             driver_arguments=driver_arguments,
+            experimental_driver_arguments = experimental_driver_arguments,
             max_driver_instances=max_driver_instances
         )
 
@@ -104,8 +114,15 @@ class SeleniumMiddleware:
 
         if not isinstance(request, SeleniumRequest):
             return None
+
+        if self.driver_queue.qsize()<1:
+            logger.debug('Adding webdriver ot the queue')
+            self.driver_queue.put(self.driver_klass(**self.driver_kwargs))
+
+
         driver = self.driver_queue.get()
         logger.debug(f'Getting webdriver from the queue ({self.driver_queue.qsize()} drivers available).')
+
 
         try:
             user_agent = request.headers['User-Agent'].decode('utf-8')  # take user-agent from scrapy
